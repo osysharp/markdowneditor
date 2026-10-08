@@ -1,0 +1,29 @@
+// Osysharp.MarkdownEditor as a package — a manifest that carries a CONTROL.
+//
+// The two halves travel in ONE archive under ONE hash: `markdown.osy` declares `control MarkdownEditor` and the
+// `controls` entries carry the bundle and chunks it names, so the declaration and the code cannot come from two
+// different builds.
+//
+// `osyrin.lock` ships too. It is the kit's own pins — each asset by content address — and the platform re-hashes
+// every asset against it when the kit loads, so a bundle rebuilt without re-pinning fails at load instead of in a
+// browser. A package that shipped the bundle without the pins would lose that check.
+package Osysharp.MarkdownEditor {
+  version     "1.0.1";
+  minPlatform "0.9.0";
+  contract    "1.1";
+  summary     "a rich EDITOR over a `Markdown` property: rich and source modes, tables, maths.";
+
+  model    "*.osy";
+
+  // ⭐ A REAL DEPENDENCY, DECLARED (BASELINE-OUT `BL-3.2`, 2026-09-22). This kit is an EDITOR over a `Markdown`
+  //    property, and a `Markdown` property is storage in `Osysharp.Markdown` — so an editor without it has nothing
+  //    to edit. The edge existed all along and was invisible while the storage was core baseline: both were simply
+  //    present in every app. It became declarable the moment the storage got a package name of its own, and this
+  //    line is the arc's dependency model proving itself on its first case.
+  use Osysharp.Markdown@1;
+  controls "osyrin.lock";
+  controls "markdown.js";
+  controls "temml.js";
+  controls "temml.css";
+  controls "diagrams/**";
+}

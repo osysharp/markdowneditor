@@ -1,0 +1,23 @@
+{
+  "name": "osy-kit-markdown",
+  "private": true,
+  "description": "Build deps for the Markdown control kit's shim. `osy control build kits/markdown` prefers this directory's own node_modules/.bin/esbuild.",
+  "devDependencies": {
+    "@codemirror/commands": "^6.8.0",
+    "@codemirror/lang-markdown": "^6.3.2",
+    "@codemirror/language": "^6.10.8",
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/view": "^6.36.4",
+    "@lezer/highlight": "^1.2.1",
+    "@milkdown/kit": "^7.21.3",
+    "esbuild": "^0.28.1",
+    "mermaid": "^11.16.0",
+    "remark-math": "^6.0.0",
+    "temml": "^0.13.4",
+    "typescript": "^5.9.3"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "chunks": "node scripts/build-chunks.mjs"
+  }
+}

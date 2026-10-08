@@ -1,0 +1,1012 @@
+/* The control's stylesheet, written against the APP's design tokens and nothing else.
+
+   Every colour, radius and typeface here resolves through a `var(--…)` the app already serves on the page, so the
+   control inherits the app's theme and its dark mode without shipping a theme of its own. That is the whole point
+   of a headless editor: we bring the mechanics, the app brings the look.
+
+   Typography reads from `--fonts-*` when the app defines them and falls back to a system stack otherwise, so an app
+   that has not thought about type still looks deliberate. `data-face` on the root switches between the three
+   stacks the `face` prop offers.
+
+   This is a REAL stylesheet, imported as text by the shim (`import EDITOR_CSS from "./markdown-theme.css"`, inlined
+   by `osy control build`) rather than written as a TypeScript template literal, so a backtick here is an ordinary
+   character and cannot end a string. */
+
+.osy-md {
+  --md-measure: 42rem;
+  /* The SOURCE view gets its own measure, in ch — 42rem is a PROSE measure (a comfortable line of sentences), and
+     source is not prose. A markdown table is a fixed-width artifact: wrap one and the columns stop lining up, which
+     is exactly what made tables unreadable in the source view. ch is the honest unit for a monospace measure. */
+  --md-source-measure: 96ch;
+  --md-sans: var(--fonts-body, ui-sans-serif, -apple-system, "Inter", "Segoe UI", system-ui, sans-serif);
+  --md-heading: var(--fonts-heading, var(--md-sans));
+  --md-mono: var(--fonts-mono, ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace);
+  /* The CHROME face — menus, the toolbar, the outline rail, a diagnostic. Deliberately NOT --md-sans, which is the
+     READING face and follows the app's body font: in the editorial face that is a display serif, and a display serif
+     in a compact dropdown reads like a mistake. Prose and chrome are different jobs, and a control that uses one
+     font for both is conflating them.
+
+     It follows the app all the same, just through the right token: the app's Ui font if it names one, its sans
+     companion (the Heading font) otherwise, and a system stack last. It is NOT re-bound per data-face below --
+     switching the READING face must not change what the menus read in. */
+  --md-ui: var(--fonts-ui, var(--fonts-heading, ui-sans-serif, -apple-system, "Inter", "Segoe UI", system-ui, sans-serif));
+  --md-dim: color-mix(in oklch, var(--colors-onsurface) 55%, transparent);
+  --md-faint: color-mix(in oklch, var(--colors-onsurface) 38%, transparent);
+
+  /* ── the menus' METRICS, as app tokens ───────────────────────────────────────────────────────────────────────
+     Every --md-* name here is the control's INTERNAL vocabulary — an app never sets one, exactly as it never sets
+     --md-sans. What it sets is the token on the right, and each of those lives in the platform's own category, so
+     an app writes ordinary theme:
+
+       theme Doc {
+         Space { MdMenu { Pad = ".4rem"; ItemPad = ".5rem .7rem"; } }
+         Size  { MdMenu { MinWidth = "14rem"; } }
+       }
+
+     A nested group namespaces WITHIN a category (it lowers to --space-mdmenu-pad); a top-level group of
+     our own does NOT exist and is a compile error, which is what makes this the shape rather than --md-menu-pad
+     being settable directly. Grouping is by KIND, not by consumer — the platform's model, and the reason a padding
+     and a shadow for the same menu are declared in different groups.
+
+     ONE DEFAULT, IN ONE PLACE — the `var()` fallback lives HERE and nowhere else. Consumers below read the derived
+     token BARE (`var(--md-menu-pad)`), because every element that uses one is a descendant of `.osy-md` and so the
+     token is always defined by the time it is read. Repeating the default at the consumer produces a second one
+     that can never apply: editing it fixes nothing and looks like it worked. */
+  --md-menu-pad:             var(--space-mdmenu-pad, .25rem);
+  --md-menu-item-pad:        var(--space-mdmenu-itempad, .4rem .55rem);
+  --md-menu-group-pad:       var(--space-mdmenu-grouppad, .45rem .55rem .2rem);
+  --md-menu-count-pad:       var(--space-mdmenu-countpad, .35rem .55rem .3rem);
+  --md-menu-min-width:       var(--size-mdmenu-minwidth, 11rem);
+  /* The bound is what FITS, and nothing else. A fixed cap such as min(70vh, 32rem) does no work on a short window
+     (70vh is smaller there) while hiding items on an ordinary one — a menu with a few app-supplied entries can
+     outgrow 32rem with plenty of window still free below it. A cap that is not about the window hides things for
+     no reason. */
+  --md-menu-max-height:      var(--size-mdmenu-maxheight, 70vh);
+  --md-menu-radius:          var(--radius-mdmenu-surface, var(--radius-md, 10px));
+  --md-menu-item-radius:     var(--radius-mdmenu-item, var(--radius-sm, 6px));
+  --md-menu-font-size:       var(--fontsize-mdmenu-base, .85rem);
+  --md-menu-group-font-size: var(--fontsize-mdmenu-group, .68rem);
+  --md-menu-count-font-size: var(--fontsize-mdmenu-count, .74rem);
+  --md-menu-group-tracking:  var(--space-mdmenu-grouptracking, .06em);
+  --md-menu-bg:              var(--colors-mdmenu-bg, var(--colors-surface));
+  --md-menu-border-color:    var(--colors-mdmenu-border, var(--colors-border));
+  --md-menu-item-hover-bg:   var(--colors-mdmenu-itemhover, color-mix(in oklch, var(--colors-onsurface) 9%, transparent));
+  --md-menu-shadow:          var(--shadow-mdmenu, 0 8px 28px color-mix(in oklch, var(--colors-onsurface) 18%, transparent));
+  /* The slash menu is wider and two-line, so its own size/type differ; everything else it shares above. */
+  --md-slash-min-width:      var(--size-mdmenu-slashminwidth, 15rem);
+  --md-slash-max-height:     var(--size-mdmenu-slashmaxheight, 17rem);
+  --md-slash-item-pad:       var(--space-mdmenu-slashitempad, .35rem .55rem);
+  --md-slash-label-size:     var(--fontsize-mdmenu-slashlabel, .87rem);
+  --md-slash-hint-size:      var(--fontsize-mdmenu-slashhint, .74rem);
+  --md-slash-item-hover-bg:  var(--colors-mdmenu-slashitemhover, color-mix(in oklch, var(--colors-onsurface) 7%, transparent));
+  --md-slash-item-active-bg: var(--colors-mdmenu-slashactive, color-mix(in oklch, var(--colors-primary) 14%, transparent));
+
+  display: flex; flex-direction: column;
+  /* Fills its container when the page gives it one, and still stands up on its own when it does not. */
+  height: 100%; min-height: 78vh;
+  background: var(--colors-surface);
+  color: var(--colors-onsurface);
+  border: 1px solid var(--colors-border);
+  border-radius: var(--radius-lg, 16px);
+  /* clip, NOT hidden. Both clip to the radius, but overflow:hidden creates a SCROLL CONTAINER, which makes this
+     element the scrollport for anything sticky inside it — and since the control itself never scrolls, the outline
+     rail then sticks to a box that never moves, and scrolls away with the page. clip has no such side effect. */
+  overflow: clip;
+}
+
+/* An editorial serif for running text with a sans for headings — the pairing that stops a document reading like a
+   form. The all-sans and all-serif faces are the alternatives, chosen with the `face` prop.
+
+   Both halves read the APP's tokens first. A hardcoded heading stack here would quietly make
+   "Fonts { Heading = … }" a no-op in the face this control uses by default — a control that brings no look of its
+   own cannot have a face that ignores the app's type. */
+.osy-md[data-face="editorial"] { --md-sans: var(--fonts-body, ui-serif, "Iowan Old Style", Charter, "Source Serif 4", Georgia, serif); --md-heading: var(--fonts-heading, ui-sans-serif, -apple-system, "Inter", "Segoe UI", system-ui, sans-serif); }
+.osy-md[data-face="sans"]      { --md-sans: ui-sans-serif, -apple-system, "Inter", "Segoe UI", system-ui, sans-serif; --md-heading: var(--md-sans); }
+.osy-md[data-face="serif"]     { --md-sans: ui-serif, "Iowan Old Style", Charter, Georgia, serif; --md-heading: var(--md-sans); }
+
+/* ── chrome ───────────────────────────────────────────────────────────── */
+.osy-md__bar {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .5rem .75rem;
+  border-bottom: 1px solid var(--colors-border);
+  background: color-mix(in oklch, var(--colors-surface) 82%, var(--colors-bg));
+  font-family: var(--md-ui);
+  font-size: .78rem;
+  flex: none;
+}
+/* Where the app's own toolbar content lands. Empty and inert when the app filled no Toolbar slot, so it
+   costs nothing; laid out as a row so app buttons sit level with the control's own. */
+.osy-md__appslot { display: flex; align-items: center; gap: .35rem; }
+.osy-md__appslot:empty { display: none; }
+.osy-md__spacer { flex: 1; }
+.osy-md__status { color: var(--md-dim); font-variant-numeric: tabular-nums; }
+.osy-md__btn {
+  font: inherit; font-weight: 550;
+  padding: .3rem .6rem;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--colors-border);
+  background: var(--colors-surface);
+  color: var(--colors-onsurface);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.osy-md__btn:hover { background: var(--colors-muted); }
+.osy-md__btn[aria-pressed="true"] { background: var(--colors-primary); color: var(--colors-onprimary); border-color: transparent; }
+
+/* An author "display: flex" beats the UA's [hidden] rule, so without this the conflict bar shows as an empty red
+   strip under the toolbar on EVERY document — permanently, since it is hidden almost all the time. */
+.osy-md__conflict[hidden] { display: none; }
+.osy-md__conflict {
+  display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+  padding: .6rem .85rem;
+  border-bottom: 1px solid color-mix(in oklch, var(--colors-danger) 35%, var(--colors-border));
+  background: color-mix(in oklch, var(--colors-danger) 9%, transparent);
+  font-family: var(--md-ui);
+  font-size: .8rem;
+  flex: none;
+}
+.osy-md__conflict-msg { flex: 1; min-width: 14rem; color: var(--colors-onbg); }
+.osy-md__btn--primary { background: var(--colors-primary); color: var(--colors-onprimary); border-color: transparent; }
+.osy-md__btn--primary:hover { background: var(--colors-primary); filter: brightness(1.08); }
+
+.osy-md__body { flex: 1; min-height: 0; display: flex; }
+.osy-md__pane { flex: 1; min-height: 0; overflow: auto; position: relative; }
+
+/* The empty-document prompt (`placeholder`) — the same idea `Input` and `Field` have, spelled the same way.
+   Painted entirely by CSS off `data-empty` + a `--osy-md-placeholder` custom property on the root. NOTHING is
+   written into the document, so a save still writes nothing and `0 sections` stays true.
+   `float: left; height: 0` is the standard ProseMirror placeholder shape and it is the reason this needs no
+   measurements of its own: the pseudo-element sits at the start of the editor surface's own content flow, so it
+   inherits that surface's padding, measure and centring exactly — and takes no vertical space, so nothing moves
+   when the first character replaces it. `pointer-events: none` keeps a click landing on the caret position. */
+.osy-md[data-empty="yes"] .ProseMirror::before {
+  content: var(--osy-md-placeholder, "");
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: color-mix(in oklch, var(--colors-onsurface) 42%, transparent);
+}
+
+/* ── the outline rail ─────────────────────────────────────────────────────────────────────────────────────────
+   Beside the scrolling pane rather than inside it, so it stays put while the document moves. Off unless the page
+   asks for it: it is only worth the width on a long document, and the page knows that where the control cannot. */
+.osy-md__outline {
+  display: none;
+  flex: none; width: 15rem;
+  /* STICKY, because the control grows with its document rather than scrolling inside a fixed box — so a rail that
+     merely scrolls with the flow disappears exactly when a long document makes it useful. align-self: flex-start
+     is what stops the flex row stretching it to full height, which would defeat sticky entirely. */
+  position: sticky; top: 0; align-self: flex-start;
+  max-height: 100vh;
+  overflow-y: auto;
+  padding: 1.25rem .5rem 3rem .9rem;
+  border-right: 1px solid var(--colors-border);
+  background: color-mix(in oklch, var(--colors-surface) 88%, var(--colors-bg));
+  font-family: var(--md-ui);
+}
+.osy-md[data-outline="on"] .osy-md__outline { display: block; }
+.osy-md__outline-item {
+  display: block; width: 100%;
+  appearance: none; border: 0; background: transparent;
+  text-align: left; cursor: pointer;
+  padding: .25rem .45rem;
+  border-radius: var(--radius-sm, 6px);
+  color: var(--md-dim);
+  font: inherit; font-size: .8rem; line-height: 1.35;
+  /* One line each: an outline is a map, and a wrapping entry stops it being scannable. */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.osy-md__outline-item:hover { background: color-mix(in oklch, var(--colors-onsurface) 7%, transparent); color: var(--colors-onsurface); }
+/* Depth by indent AND by weight — indent alone is hard to read once entries are truncated. */
+.osy-md__outline-item[data-level="1"] { padding-left: .45rem; font-weight: 600; color: var(--colors-onsurface); }
+.osy-md__outline-item[data-level="2"] { padding-left: 1.1rem; }
+.osy-md__outline-item[data-level="3"] { padding-left: 1.75rem; font-size: .77rem; }
+.osy-md__outline-item[data-level="4"] { padding-left: 2.4rem; font-size: .77rem; }
+.osy-md__outline-empty { color: var(--md-faint); font-size: .78rem; padding: .25rem .45rem; margin: 0; }
+
+/* ── density ──────────────────────────────────────────────────────────────────────────────────────────────────
+   A per-call-site choice: the same app shows a document editor and a chat transcript, and they want different air.
+   Only SPACING and the type scale change — colour, typeface and every affordance stay exactly as they are, so a
+   compact editor is the same control with less padding, not a second design. */
+.osy-md[data-density="compact"] .ProseMirror {
+  padding: 1.1rem clamp(1rem, 3vw, 1.6rem) 4rem;
+  font-size: .95rem;
+  line-height: 1.55;
+}
+.osy-md[data-density="compact"] .ProseMirror > * + * { margin-top: .6em; }
+.osy-md[data-density="compact"] .ProseMirror > * + h1 { margin-top: 1.4em; }
+.osy-md[data-density="compact"] .ProseMirror > * + h2 { margin-top: 1.2em; }
+.osy-md[data-density="compact"] .ProseMirror > * + h3 { margin-top: 1.05em; }
+.osy-md[data-density="compact"] h1 { font-size: 1.5rem; }
+.osy-md[data-density="compact"] h2 { font-size: 1.2rem; }
+.osy-md[data-density="compact"] h3 { font-size: 1.03rem; }
+.osy-md[data-density="compact"] .osy-md__bar { padding: .3rem .55rem; }
+.osy-md[data-density="compact"] .osy-md__btn { padding: .2rem .45rem; }
+.osy-md[data-density="compact"] blockquote { padding: .55em .8em; }
+.osy-md[data-density="compact"] pre { padding: .7rem .85rem; }
+.osy-md[data-density="compact"] li { margin: .1em 0; }
+.osy-md[data-density="compact"] .osy-md__outline { padding-top: .8rem; width: 13rem; }
+
+/* The rail costs width the document needs more; below the breakpoint the document wins. */
+@media (max-width: 860px) {
+  .osy-md[data-outline="on"] .osy-md__outline { display: none; }
+}
+
+/* ── the reading surface ──────────────────────────────────────────────── */
+.osy-md .ProseMirror {
+  outline: none;
+  max-width: var(--md-measure);
+  margin: 0 auto;
+  padding: clamp(1.5rem, 5vw, 3.5rem) clamp(1.15rem, 5vw, 3rem) 8rem;
+  font-family: var(--md-sans);
+  font-size: 1.0625rem;
+  line-height: 1.72;
+  letter-spacing: -0.003em;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.osy-md .ProseMirror > * + * { margin-top: 1.1em; }
+
+.osy-md h1, .osy-md h2, .osy-md h3, .osy-md h4, .osy-md h5, .osy-md h6 {
+  font-family: var(--md-heading);
+  font-weight: 680; letter-spacing: -0.022em; line-height: 1.2;
+  color: var(--colors-onbg); text-wrap: balance; margin: 0;
+}
+.osy-md h1 { font-size: 2.1rem; font-weight: 720; letter-spacing: -0.032em; }
+.osy-md h2 { font-size: 1.5rem; letter-spacing: -0.026em; }
+.osy-md h3 { font-size: 1.2rem; }
+.osy-md h4 { font-size: 1.04rem; }
+.osy-md h5, .osy-md h6 { font-size: .95rem; color: var(--md-dim); }
+
+/* Space above a heading belongs to the heading, not to the paragraph before it. */
+.osy-md .ProseMirror > * + h1 { margin-top: 2.5em; }
+.osy-md .ProseMirror > * + h2 { margin-top: 2em; }
+.osy-md .ProseMirror > * + h3 { margin-top: 1.7em; }
+.osy-md h1 + *, .osy-md h2 + *, .osy-md h3 + *, .osy-md h4 + * { margin-top: .65em; }
+
+.osy-md p { margin: 0; }
+.osy-md strong { font-weight: 650; color: var(--colors-onbg); }
+.osy-md a {
+  color: var(--colors-primary);
+  /* A link opens on a plain click, so it has to LOOK clickable — inside an editable region the caret is the default
+     cursor, which says "this is text to change" rather than "this goes somewhere". */
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklch, var(--colors-primary) 35%, transparent);
+  text-underline-offset: .18em; text-decoration-thickness: .08em;
+}
+.osy-md a:hover { text-decoration-color: var(--colors-primary); }
+
+.osy-md code {
+  font-family: var(--md-mono); font-size: .85em;
+  padding: .12em .38em;
+  border-radius: var(--radius-sm, 6px);
+  background: color-mix(in oklch, var(--colors-muted) 82%, var(--colors-surface));
+  border: 1px solid color-mix(in oklch, var(--colors-border) 60%, transparent);
+  color: color-mix(in oklch, var(--colors-onsurface) 92%, var(--colors-primary));
+}
+.osy-md pre {
+  font-family: var(--md-mono); font-size: .855rem; line-height: 1.6;
+  background: color-mix(in oklch, var(--colors-muted) 70%, var(--colors-surface));
+  border: 1px solid var(--colors-border);
+  border-radius: var(--radius-md, 10px);
+  padding: 1rem 1.15rem; overflow-x: auto; tab-size: 2;
+}
+.osy-md pre code { background: none; border: none; padding: 0; font-size: inherit; color: inherit; white-space: pre; }
+
+/* ── code highlighting ────────────────────────────────────────────────────────────────────────────────────────
+   Derived from the app's ACCENT rather than picked by hand, so a code block belongs to the app's palette in light
+   and dark instead of importing a third-party theme's opinion. Hue rotations off one token keep the set coherent
+   however the accent moves; the base text stays the prose colour, so code reads as text first and colour second. */
+.osy-md pre { position: relative; }
+.osy-tok-kw   { color: color-mix(in oklch, var(--colors-primary) 88%, var(--colors-onsurface)); font-weight: 600; }
+.osy-tok-str  { color: oklch(from var(--colors-primary) l c calc(h + 128)); }
+.osy-tok-num  { color: oklch(from var(--colors-primary) l c calc(h + 196)); }
+.osy-tok-com  { color: var(--md-faint); font-style: italic; }
+.osy-tok-type { color: oklch(from var(--colors-primary) l c calc(h + 62)); }
+.osy-tok-fn   { color: oklch(from var(--colors-primary) l c calc(h - 46)); }
+.osy-tok-prop { color: oklch(from var(--colors-primary) l c calc(h + 90)); }
+.osy-tok-tag  { color: oklch(from var(--colors-primary) l c calc(h + 160)); }
+.osy-tok-punc { color: var(--md-dim); }
+.osy-tok-var  { color: var(--colors-onsurface); }
+
+/* The language, from the fence itself. Shown even when we cannot colour that language — knowing what the fence
+   SAYS is useful on its own, and silence there is how a mislabelled block goes unnoticed. */
+.osy-md pre[data-language]::before {
+  content: attr(data-language);
+  position: absolute; top: .35rem; right: .5rem;
+  font-family: var(--md-mono); font-size: .66rem; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--md-faint);
+  pointer-events: none;
+}
+.osy-md[data-density="compact"] pre[data-language]::before { top: .2rem; right: .35rem; }
+
+.osy-md blockquote {
+  border-left: 3px solid color-mix(in oklch, var(--colors-primary) 55%, var(--colors-border));
+  background: color-mix(in oklch, var(--colors-muted) 45%, transparent);
+  border-radius: 0 var(--radius-sm, 6px) var(--radius-sm, 6px) 0;
+  padding: .85em 1.15em; margin: 0;
+  color: color-mix(in oklch, var(--colors-onsurface) 88%, transparent);
+}
+.osy-md blockquote > * + * { margin-top: .7em; }
+
+.osy-md ul, .osy-md ol { padding-left: 1.45em; margin: 0; }
+.osy-md li { margin: .22em 0; }
+.osy-md li > ul, .osy-md li > ol { margin-top: .22em; }
+.osy-md ul { list-style: none; }
+.osy-md ul > li { position: relative; }
+.osy-md ul > li::before {
+  content: ""; position: absolute; left: -.95em; top: .72em;
+  width: 5px; height: 5px; border-radius: 50%;
+  background: color-mix(in oklch, var(--colors-onsurface) 42%, transparent);
+}
+.osy-md ol > li::marker { color: var(--md-dim); font-variant-numeric: tabular-nums; }
+
+/* ── task lists ───────────────────────────────────────────────────────────
+   The headless core parses GFM task items and records their state in a data-checked attribute on the item, but ships no
+   checkbox UI — that lives in the component build we deliberately do not use (it drags in a second framework).
+   So the box is drawn here from the tokens, and the shim makes it clickable via a ProseMirror transaction. Drawing
+   it rather than using <input> also means it inherits the app's palette instead of the OS control's. */
+.osy-md li[data-item-type="task"] {
+  list-style: none;
+  padding-left: 1.75em;
+  position: relative;
+}
+.osy-md li[data-item-type="task"]::before {
+  content: "";
+  position: absolute;
+  left: 0; top: .38em;
+  width: 1.05em; height: 1.05em;
+  box-sizing: border-box;
+  border: 1.5px solid color-mix(in oklch, var(--colors-onsurface) 36%, transparent);
+  border-radius: 4px;
+  background: var(--colors-surface);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.osy-md li[data-item-type="task"]:hover::before { border-color: var(--colors-primary); }
+.osy-md li[data-item-type="task"][data-checked="true"]::before {
+  background-color: var(--colors-primary);
+  border-color: var(--colors-primary);
+  /* The tick is drawn, so it stays crisp at any size and needs no icon dependency. */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M3.5 8.4l3 3 6-6.8' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-size: 78%; background-position: center; background-repeat: no-repeat;
+}
+/* A completed item reads as completed — the reason checklists exist. */
+.osy-md li[data-item-type="task"][data-checked="true"] > p { color: var(--md-dim); text-decoration: line-through; text-decoration-color: color-mix(in oklch, var(--colors-onsurface) 30%, transparent); }
+
+/* ── definition-ish and misc block elements ───────────────────────────────── */
+.osy-md del { color: var(--md-dim); }
+.osy-md sup, .osy-md sub { font-size: .75em; line-height: 0; }
+.osy-md kbd {
+  font-family: var(--md-mono); font-size: .82em;
+  padding: .1em .4em; border-radius: 4px;
+  border: 1px solid var(--colors-border);
+  border-bottom-width: 2px;
+  background: var(--colors-muted);
+}
+/* FOOTNOTES — apparatus, not body text.
+
+   These selectors are the ones the editor's own nodes actually produce:
+     reference  -> <sup data-type="footnote_reference" data-label="1">1</sup>
+     definition -> <dl data-type="footnote_definition" data-label="1"><dt>1</dt><dd>…</dd></dl>
+   Not .footnote-ref / .footnotes: those are the class names a markdown-to-HTML converter emits, and nothing in this
+   editor carries them. */
+.osy-md sup[data-type="footnote_reference"] {
+  font-size: .72em;
+  vertical-align: super; line-height: 0;
+  color: var(--colors-primary);
+  cursor: pointer;
+  /* A superscript numeral is a ~7px target. The padding is the hit area; the negative margin keeps it from opening
+     a gap in the line it sits in, so the prose spacing is unchanged. */
+  padding: 0 .25em; margin: 0 -.15em;
+  border-radius: 3px;
+}
+.osy-md sup[data-type="footnote_reference"]:hover {
+  background: color-mix(in oklch, var(--colors-primary) 14%, transparent);
+}
+/* The note itself. A rule above the FIRST one is what separates the apparatus from the prose — each note is its own
+   dl, so the rule goes on every one and is then removed from the runs that follow a sibling. */
+.osy-md dl[data-type="footnote_definition"] {
+  display: grid;
+  /* The gutter FITS ITS MARKER and never wraps. A label is not always a numeral — a named one like "why" is legal
+     markdown — and a fixed width would wrap a label like "rows" down two lines. The floor keeps a run of NUMBERED
+     notes aligned down a common edge (every numeral is the same width); max-content is what stops a named one from
+     ever breaking. */
+  grid-template-columns: minmax(1.6rem, max-content) minmax(0, 1fr);
+  gap: 0 .5rem;
+  margin: 2.5em 0 0;
+  padding-top: 1em;
+  border-top: 1px solid var(--md-menu-border-color);
+  font-size: .92em;
+  color: var(--md-dim);
+}
+/* Consecutive notes are ONE apparatus block, not one rule each. */
+.osy-md dl[data-type="footnote_definition"] + dl[data-type="footnote_definition"] {
+  margin-top: .5em; padding-top: 0; border-top: 0;
+}
+/* The marker sits in its own gutter so every note's prose aligns down a common edge — the thing that makes a run of
+   footnotes read as a list rather than as loose paragraphs. */
+.osy-md dl[data-type="footnote_definition"] > dt {
+  grid-column: 1;
+  color: var(--colors-primary);
+  font-size: .85em;
+  text-align: right;
+  cursor: pointer;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.osy-md dl[data-type="footnote_definition"] > dt:hover { text-decoration: underline; }
+.osy-md dl[data-type="footnote_definition"] > dd { grid-column: 2; margin: 0; }
+/* A note's paragraphs are tight: the grid gap already separates them from the marker, and prose spacing here would
+   make a two-line note look like two notes. */
+.osy-md dl[data-type="footnote_definition"] > dd > p { margin: 0; }
+.osy-md dl[data-type="footnote_definition"] > dd > p + p { margin-top: .5em; }
+
+/* Landing. After a scroll you have to FIND what you asked for — a note arriving silently in a screen of small grey
+   text has not really been reached. Fades out on its own; it marks a place, it does not select anything. */
+@keyframes osy-md-fn-flash {
+  /* Light enough to read as "here it is" rather than as a selection — it marks a place, it does not choose text. */
+  from { background: color-mix(in oklch, var(--colors-primary) 18%, transparent); }
+  to   { background: transparent; }
+}
+.osy-md .osy-md__fn-flash { animation: osy-md-fn-flash 1.4s ease-out; border-radius: 4px; }
+@media (prefers-reduced-motion: reduce) {
+  .osy-md .osy-md__fn-flash { animation-duration: .01s; }
+}
+
+.osy-md table { width: 100%; border-collapse: collapse; font-size: .94em; display: block; overflow-x: auto; }
+.osy-md th, .osy-md td { border: 1px solid var(--colors-border); padding: .5em .75em; text-align: left; vertical-align: top; }
+.osy-md th {
+  font-weight: 640; color: var(--colors-onbg); border-bottom-width: 2px;
+  background: color-mix(in oklch, var(--colors-muted) 60%, var(--colors-surface));
+}
+.osy-md hr { border: none; height: 1px; background: var(--colors-border); margin: 2.6em auto; }
+.osy-md img { max-width: 100%; border-radius: var(--radius-md, 10px); display: block; }
+.osy-md .ProseMirror ::selection { background: color-mix(in oklch, var(--colors-primary) 22%, transparent); }
+
+/* ── raw source mode ──────────────────────────────────────────────────── */
+.osy-md__raw { height: 100%; }
+.osy-md__raw .cm-editor { background: transparent; height: 100%; }
+.osy-md__raw .cm-editor.cm-focused { outline: none; }
+.osy-md__raw .cm-scroller { font-family: var(--md-mono); font-size: .89rem; line-height: 1.75; padding: clamp(1.5rem, 5vw, 3rem) 0 8rem; }
+.osy-md__raw .cm-content { font-family: var(--md-mono); max-width: var(--md-source-measure); margin: 0 auto; padding: 0 clamp(1.15rem, 5vw, 3rem); caret-color: var(--colors-primary); }
+.osy-md__raw .cm-cursor { border-left-color: var(--colors-primary); border-left-width: 2px; }
+.osy-md__raw .cm-selectionBackground, .osy-md__raw .cm-editor ::selection { background: color-mix(in oklch, var(--colors-primary) 22%, transparent) !important; }
+.osy-md__raw .cm-gutters { display: none; }
+.osy-md__raw .cm-activeLine { background: color-mix(in oklch, var(--colors-muted) 35%, transparent); }
+
+/* ── the failure surface ──────────────────────────────────────────────── */
+.osy-md__error {
+  margin: 2rem auto; max-width: var(--md-measure);
+  padding: 1rem 1.15rem;
+  border: 1px solid color-mix(in oklch, var(--colors-danger) 40%, var(--colors-border));
+  background: color-mix(in oklch, var(--colors-danger) 8%, transparent);
+  border-radius: var(--radius-md, 10px);
+  font-family: var(--md-ui); font-size: .88rem;
+}
+
+/* ── mobile ───────────────────────────────────────────────────────────────
+   A phone is not a narrow desktop. The chrome drops its border and radius so the editor runs edge to edge (a 16px
+   frame on a 390px screen spends 8% of the reading width on decoration), the type scale compresses so a heading
+   still reads as one without eating the viewport, tap targets reach the 44px minimum, and the bottom padding is
+   deep enough that the caret never hides behind the on-screen keyboard. */
+@media (max-width: 640px) {
+  .osy-md { border: none; border-radius: 0; min-height: 100svh; }   /* svh, not vh — vh sits under the browser chrome */
+  .osy-md__bar {
+    padding: .45rem .6rem; gap: .35rem;
+    position: sticky; top: 0; z-index: 2;
+    background: color-mix(in oklch, var(--colors-surface) 92%, var(--colors-bg));
+    backdrop-filter: blur(8px);
+  }
+  .osy-md__btn { min-height: 40px; padding: .4rem .7rem; }
+  .osy-md__status { font-size: .72rem; }
+
+  .osy-md .ProseMirror { font-size: 1.02rem; line-height: 1.65; padding: 1.5rem 1.15rem 60vh; overflow-wrap: anywhere; }
+  .osy-md h1 { font-size: 1.65rem; }
+  .osy-md h2 { font-size: 1.32rem; }
+  .osy-md h3 { font-size: 1.12rem; }
+  .osy-md .ProseMirror > * + h1 { margin-top: 1.9em; }
+  .osy-md .ProseMirror > * + h2 { margin-top: 1.6em; }
+  .osy-md .ProseMirror > * + h3 { margin-top: 1.4em; }
+
+  .osy-md pre { padding: .8rem .9rem; font-size: .8rem; border-radius: var(--radius-sm, 6px); }
+  .osy-md blockquote { padding: .7em .9em; }
+  .osy-md ul, .osy-md ol { padding-left: 1.25em; }
+
+  .osy-md__raw .cm-scroller { padding: 1.25rem 0 60vh; }
+  .osy-md__raw .cm-content { padding: 0 1.15rem; font-size: .86rem; }
+}
+
+/* ── block handle (⋯ menu + ⠿ drag), positioned by plugin/block ───────────────────────────────────────────────
+   The handle floats in the left margin beside whichever block the pointer is over. It is deliberately QUIET —
+   faint until you approach it — because a control that shouts at every paragraph makes a document feel like a
+   form. data-show is the plugin's own visibility flag. */
+.osy-md__handle {
+  position: absolute;
+  /* Anchored at the TOP until the plugin positions it. Without this it lands at its STATIC position — after the
+     document — and, being absolutely positioned inside the scrolling pane, extends that pane's scrollHeight by its
+     own height. 25px of phantom scroll is enough to swallow the first wheel gesture at each end of the document:
+     the pane consumes it reaching its own limit, and only the SECOND gesture chains to the page. */
+  top: 0; left: 0;
+  display: flex; align-items: center; gap: .1rem;
+  padding: .1rem;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity .12s ease;
+  /* Above the text, but below the menu it opens. */
+  z-index: 2;
+}
+.osy-md__handle[data-show="true"] { opacity: 1; }
+/* Invisible must also mean untouchable — an opacity-0 handle still takes clicks. */
+.osy-md__handle:not([data-show="true"]) { pointer-events: none; }
+.osy-md__handle:active { cursor: grabbing; }
+
+.osy-md__handle-btn,
+.osy-md__handle-grip {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.35rem; height: 1.35rem;
+  border: 0; background: transparent;
+  color: var(--md-faint);
+  border-radius: var(--radius-sm, 6px);
+  font-size: .95rem; line-height: 1;
+  transition: background .12s ease, color .12s ease;
+}
+.osy-md__handle-btn { cursor: pointer; }
+.osy-md__handle:hover .osy-md__handle-btn,
+.osy-md__handle:hover .osy-md__handle-grip { color: var(--md-dim); }
+.osy-md__handle-btn:hover,
+.osy-md__handle-grip:hover {
+  background: color-mix(in oklch, var(--colors-onsurface) 8%, transparent);
+  color: var(--colors-onsurface);
+}
+.osy-md__handle-btn:focus-visible { outline: 2px solid var(--colors-primary, currentColor); outline-offset: 1px; }
+
+/* ── the three menus' METRICS are the app's too ────────────────────────────────────────────────────────────────
+   Colour, radius and typeface resolve through the app's theme tokens, and so does the GEOMETRY: paddings, widths,
+   shadow and the hover tint each resolve through a token whose fallback is the built-in default, so nothing changes
+   unless an app says so — and an app can make a menu denser or wider, not only recolour it. The app-facing names
+   are defined at the top of this file, beside --md-sans; do not set --md-menu-* from an app, any more than you
+   would set --md-sans.
+
+   Blocks, slash and table menus share one vocabulary on purpose: they are one popover language, and letting them
+   drift is how a control starts looking like three controls.
+
+   What the tokens do NOT give an app is the menus' CONTENTS. An app adds its own block-menu entries through the
+   `extraItems` prop instead.
+
+   Same trap as the conflict bar above: an author "display: flex" beats the UA [hidden] rule, so without this the
+   menu is permanently visible, parked at the top-left with no position set yet. */
+.osy-md__blockmenu[hidden] { display: none; }
+.osy-md__blockmenu {
+  position: absolute;
+  z-index: 20;
+  min-width: var(--md-menu-min-width);
+  padding: var(--md-menu-pad);
+  display: flex; flex-direction: column;
+  /* Turn into has nine entries, and a table adds nine more — past that the last items sit under the
+     window, where clamping the position cannot help because the menu is simply taller than the space. Scroll it,
+     the same way the slash menu does. The VALUE lives with the other derived metrics at the top of this file. */
+  max-height: var(--md-menu-max-height); overflow-y: auto;
+  background: var(--md-menu-bg);
+  border: 1px solid var(--md-menu-border-color);
+  border-radius: var(--md-menu-radius);
+  box-shadow: var(--md-menu-shadow);
+  font-family: var(--md-ui);
+  font-size: var(--md-menu-font-size);
+}
+/* A group label, not a heading — it should organise the list without competing with the items for attention. */
+.osy-md__blockmenu-group {
+  padding: var(--md-menu-group-pad);
+  font-size: var(--md-menu-group-font-size); font-weight: 600;
+  letter-spacing: var(--md-menu-group-tracking); text-transform: uppercase;
+  color: var(--md-faint);
+}
+/* Every group after the first is also separated by a rule — the label alone reads as a list item at a glance. */
+.osy-md__blockmenu-group ~ .osy-md__blockmenu-group {
+  margin-top: var(--md-menu-pad); padding-top: .45rem;
+  border-top: 1px solid var(--md-menu-border-color);
+}
+.osy-md__blockmenu-item {
+  appearance: none; border: 0; background: transparent;
+  color: var(--colors-onsurface);
+  text-align: left;
+  padding: var(--md-menu-item-pad);
+  border-radius: var(--md-menu-item-radius);
+  cursor: pointer;
+  font: inherit;
+}
+.osy-md__blockmenu-item:hover { background: var(--md-menu-item-hover-bg); }
+.osy-md__blockmenu-item:focus-visible { outline: 2px solid var(--colors-primary, currentColor); outline-offset: -2px; }
+/* Destructive last, and marked as such — the one item in the list you cannot undo by eye. */
+.osy-md__blockmenu-item[data-act="delete"] { color: var(--colors-danger, #d1453b); }
+/* The language a code block already has — a menu of eight look-alike options needs to say which one you are on. */
+.osy-md__blockmenu-item[data-current="true"] { font-weight: 650; color: var(--colors-primary); }
+.osy-md__blockmenu-item[data-current="true"]::after { content: " ✓"; }
+/* The rule above the APP's own entries. They are drawn with the same item chrome (one look, one keyboard
+   model) but kept in their own section: the editor cannot know what an app's verb does, and presenting them as
+   though they were its own would promise a consistency it has no way to keep. Hidden when the app supplied none,
+   so a menu with no extra items has no stray rule. */
+.osy-md__blockmenu-rule {
+  margin-top: var(--md-menu-pad); padding-top: .45rem;
+  border-top: 1px solid var(--md-menu-border-color);
+}
+.osy-md__blockmenu-rule[hidden] { display: none; }
+
+/* WHERE IT WILL LAND. Without a drop indicator a block drag is guesswork — you are aiming at a gap you cannot see.
+   The cursor plugin draws this line between the two blocks the drop would separate; it is configured to take its
+   colour from CSS rather than an inline value, so it lands on the app's accent like everything else here. */
+.milkdown-drop-indicator {
+  background: var(--colors-primary);
+  border-radius: 2px;
+  /* A hairline reads as an artifact; this should read as a deliberate insertion point. */
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--colors-primary) 30%, transparent);
+}
+
+/* ── the slash menu ───────────────────────────────────────────────────────────────────────────────────────────
+   Positioned at the caret by plugin/slash. Same surface as the block menu — one popover language for the control,
+   not two — with a second line per item because "Code" and "Divider" are not self-explanatory the first time. */
+.osy-md__slash {
+  position: absolute;
+  z-index: 30;
+  display: none;
+  min-width: var(--md-slash-min-width);
+  max-height: var(--md-slash-max-height); overflow-y: auto;
+  padding: var(--md-menu-pad);
+  background: var(--md-menu-bg);
+  border: 1px solid var(--md-menu-border-color);
+  border-radius: var(--md-menu-radius);
+  box-shadow: var(--md-menu-shadow);
+  font-family: var(--md-ui);
+}
+.osy-md__slash[data-show="true"] { display: block; }
+.osy-md__slash-item {
+  appearance: none; border: 0; background: transparent;
+  display: flex; flex-direction: column; gap: .05rem;
+  width: 100%; text-align: left;
+  padding: var(--md-slash-item-pad);
+  border-radius: var(--md-menu-item-radius);
+  cursor: pointer; font: inherit;
+  color: var(--colors-onsurface);
+}
+.osy-md__slash-item:hover { background: var(--md-slash-item-hover-bg); }
+/* The keyboard's position, not the mouse's — this is a menu you drive with arrows, so the active row has to be
+   unmistakable even while the pointer sits somewhere else entirely. */
+.osy-md__slash-item[data-active="true"] { background: var(--md-slash-item-active-bg); }
+.osy-md__slash-label { font-size: var(--md-slash-label-size); font-weight: 550; }
+.osy-md__slash-hint { font-size: var(--md-slash-hint-size); color: var(--md-dim); }
+.osy-md__slash-empty { padding: .5rem .55rem; font-size: .8rem; color: var(--md-dim); }
+
+/* ── table controls on the cell borders ────────────────────────────────────────────────────────────────────────
+   Grips on the edges: one per column along the top, one per row down the left, and a "+" past each trailing edge.
+   They are QUIET until you approach them — a table with a bar of buttons welded to it stops looking like a table. */
+.osy-md__tgrips[hidden] { display: none; }
+.osy-md__tgrips {
+  position: absolute; inset: 0;
+  pointer-events: none;      /* only the grips themselves take the pointer; the table underneath stays editable */
+  z-index: 14;
+}
+.osy-md__tgrip {
+  position: absolute;
+  pointer-events: auto;
+  appearance: none; border: 0;
+  padding: 0;
+  background: color-mix(in oklch, var(--colors-onsurface) 12%, transparent);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+/* NOT gated on hovering the overlay. The overlay takes no pointer events (so the table underneath stays editable),
+   which means it never matches :hover — the grips would only appear once you hovered a grip you could not see. The
+   control shows the overlay exactly while the pointer is over the table, so being shown IS the hover state. Solid
+   on the one you are about to press. */
+.osy-md__tgrip:hover { background: var(--colors-primary); }
+.osy-md__tgrip:focus-visible { opacity: 1; outline: 2px solid var(--colors-primary); outline-offset: 1px; }
+/* 12px, which is exactly the offset they are drawn at — so a grip TOUCHES its table and there is no gap at all
+   for the pointer to cross on the way to it. */
+.osy-md__tgrip--col { height: 12px; }
+.osy-md__tgrip--row { width: 12px; }
+.osy-md__tplus {
+  position: absolute;
+  pointer-events: auto;
+  appearance: none;
+  width: 18px; height: 18px;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0;
+  border: 1px solid var(--colors-border);
+  background: var(--colors-surface);
+  color: var(--md-dim);
+  border-radius: 50%;
+  font: inherit; font-size: .8rem; line-height: 1;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.osy-md__tplus:hover { color: var(--colors-primary); border-color: var(--colors-primary); }
+
+.osy-md__tmenu[hidden] { display: none; }
+.osy-md__tmenu {
+  position: absolute;
+  z-index: 22;
+  min-width: var(--md-menu-min-width);
+  padding: var(--md-menu-pad);
+  display: flex; flex-direction: column;
+  background: var(--md-menu-bg);
+  border: 1px solid var(--md-menu-border-color);
+  border-radius: var(--md-menu-radius);
+  box-shadow: var(--md-menu-shadow);
+  font-family: var(--md-ui); font-size: var(--md-menu-font-size);
+}
+.osy-md__tmenu-item {
+  appearance: none; border: 0; background: transparent;
+  color: var(--colors-onsurface);
+  text-align: left;
+  padding: var(--md-menu-item-pad);
+  border-radius: var(--md-menu-item-radius);
+  cursor: pointer; font: inherit;
+}
+.osy-md__tmenu-item:hover { background: var(--md-menu-item-hover-bg); }
+.osy-md__tmenu-item[data-danger="true"] { color: var(--colors-danger, #d1453b); }
+/* Touch has no hover, so an edge grip is unreachable — the block menu's table group is the path there. */
+@media (hover: none) { .osy-md__tgrips { display: none; } }
+
+/* ── find & replace ───────────────────────────────────────────────────────────────────────────────────────────
+   The editor draws no find bar: the app draws its own, typically in the Toolbar slot. What stays here is the only
+   part that is the editor's business — what a match looks like ON the document, which the app cannot reach. */
+/* EVERY match is tinted; the one you are ON is the accent. Without the second state, "next" moves something you
+   cannot see and the buttons feel broken. */
+.osy-md__find-hit {
+  background: color-mix(in oklch, var(--colors-primary) 16%, transparent);
+  border-radius: 2px;
+}
+.osy-md__find-hit--current {
+  background: var(--colors-primary);
+  color: var(--colors-onprimary);
+}
+
+/* ── the link popover ─────────────────────────────────────────────────────────────────────────────────────────
+   Anchored under the link it is about. Same surface as the other three popovers — one popover language for the
+   control — laid out as a row, because it is read left to right: where it goes, then what you can do about it. */
+.osy-md__linkpop[hidden] { display: none; }   /* an author "display: flex" beats the UA [hidden] rule */
+.osy-md__linkpop {
+  position: absolute;
+  z-index: 32;
+  display: flex; flex-direction: column;
+  max-width: min(28rem, 90vw);
+  padding: .25rem .3rem;
+  background: var(--colors-surface);
+  border: 1px solid var(--colors-border);
+  border-radius: var(--radius-md, 10px);
+  box-shadow: 0 8px 28px color-mix(in oklch, var(--colors-onsurface) 18%, transparent);
+  font-family: var(--md-ui);
+  font-size: .8rem;
+}
+.osy-md__linkpop-row { display: flex; align-items: center; gap: .15rem; }
+.osy-md__linkpop[data-mode="view"] .osy-md__linkpop-editrow { display: none; }
+.osy-md__linkpop[data-mode="edit"] .osy-md__linkpop-row:not(.osy-md__linkpop-editrow) { display: none; }
+/* The destination, and it has to be READABLE — a popover that shows a truncated URL in the same grey as the
+   buttons tells you nothing you could not already guess. */
+.osy-md__linkpop-url {
+  color: var(--md-dim);
+  text-decoration: none;
+  padding: 0 .35rem;
+  max-width: 20rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--md-mono); font-size: .74rem;
+}
+.osy-md__linkpop-url[href]:hover { color: var(--colors-primary); text-decoration: underline; }
+.osy-md__linkpop-btn {
+  appearance: none; border: 0; background: transparent;
+  color: var(--colors-onsurface);
+  height: 1.7rem; padding: 0 .5rem;
+  display: inline-flex; align-items: center;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer; font: inherit; font-size: .78rem; font-weight: 550;
+  transition: background 120ms ease, color 120ms ease;
+}
+.osy-md__linkpop-btn:hover { background: color-mix(in oklch, var(--colors-onsurface) 9%, transparent); }
+.osy-md__linkpop-btn:focus-visible { outline: 2px solid var(--colors-primary, currentColor); outline-offset: -2px; }
+.osy-md__linkpop-btn[hidden] { display: none; }
+.osy-md__linkpop-remove { color: var(--md-dim); }
+.osy-md__linkpop-remove:hover { color: var(--colors-danger, #d1453b); }
+.osy-md__linkpop-field {
+  font: inherit; font-size: .8rem;
+  width: 20rem; max-width: 78vw; height: 1.7rem;
+  padding: 0 .5rem;
+  border: 1px solid var(--colors-border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--colors-bg);
+  color: var(--colors-onsurface);
+}
+.osy-md__linkpop-field:focus { outline: none; border-color: var(--colors-primary); }
+@media (hover: none) {
+  .osy-md__linkpop-btn { height: 2.5rem; }
+  .osy-md__linkpop-field { height: 2.5rem; }
+}
+@media (prefers-reduced-motion: reduce) { .osy-md__linkpop-btn { transition: none; } }
+
+/* ── the selection toolbar ────────────────────────────────────────────────────────────────────────────────────
+   Positioned above the selection by plugin/tooltip. Same surface as the other two popovers — one popover language
+   for the control — but laid out as a compact ROW: it appears over the text you are reading, so it has to take as
+   little of it as possible. */
+.osy-md__seltool {
+  position: absolute;
+  z-index: 30;
+  display: none;
+  padding: .2rem;
+  background: var(--colors-surface);
+  border: 1px solid var(--colors-border);
+  border-radius: var(--radius-md, 10px);
+  box-shadow: 0 8px 28px color-mix(in oklch, var(--colors-onsurface) 18%, transparent);
+  font-family: var(--md-ui);
+}
+.osy-md__seltool[data-show="true"] { display: block; }
+.osy-md__seltool-row { display: flex; align-items: center; gap: .1rem; }
+/* Same trap as the conflict bar and the block menu: an author "display: flex" beats the UA [hidden] rule, so the
+   two faces are switched by an explicit rule rather than by the hidden attribute. */
+.osy-md__seltool[data-mode="marks"] .osy-md__seltool-linkrow { display: none; }
+.osy-md__seltool[data-mode="link"] .osy-md__seltool-row:not(.osy-md__seltool-linkrow) { display: none; }
+.osy-md__seltool-btn[hidden] { display: none; }
+
+.osy-md__seltool-btn {
+  appearance: none; border: 0; background: transparent;
+  color: var(--colors-onsurface);
+  min-width: 1.85rem; height: 1.85rem;
+  padding: 0 .4rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  font: inherit; font-size: .87rem; line-height: 1;
+  transition: background 120ms ease, color 120ms ease;
+}
+.osy-md__seltool-btn:hover { background: color-mix(in oklch, var(--colors-onsurface) 9%, transparent); }
+.osy-md__seltool-btn:focus-visible { outline: 2px solid var(--colors-primary, currentColor); outline-offset: -2px; }
+/* ON, not merely hovered — this is the one place the toolbar reports the document's state back rather than offering
+   an action, so it reads as a pressed key. */
+.osy-md__seltool-btn[data-active="true"] {
+  background: color-mix(in oklch, var(--colors-primary) 16%, transparent);
+  color: var(--colors-primary);
+}
+/* Each button is its own mark, drawn as that mark — the fastest possible legend. */
+.osy-md__seltool-btn[data-mark="strong"] { font-weight: 750; }
+.osy-md__seltool-btn[data-mark="emphasis"] { font-style: italic; font-family: var(--md-heading); }
+.osy-md__seltool-btn[data-mark="strike_through"] { text-decoration: line-through; }
+.osy-md__seltool-btn[data-mark="inlineCode"] { font-family: var(--md-mono); font-size: .74rem; letter-spacing: -.02em; }
+.osy-md__seltool-btn[data-mark="link"] { font-size: .8rem; padding: 0 .5rem; }
+.osy-md__seltool-sep {
+  width: 1px; height: 1.1rem;
+  margin: 0 .2rem;
+  background: var(--colors-border);
+}
+
+/* The text a link is being typed FOR, drawn while the URL field holds focus — a browser paints a real selection only
+   in the focused element, so without this you are addressing something you can no longer see. Deliberately the same
+   tint as a selected block run: one language for "this is what the next action is about". */
+.osy-md__seltool-keep {
+  background: color-mix(in oklch, var(--colors-primary) 20%, transparent);
+  border-radius: 2px;
+}
+
+.osy-md__seltool-linkrow { gap: .25rem; padding: 0 .1rem; }
+.osy-md__seltool-url {
+  font: inherit; font-size: .82rem;
+  width: 16rem; max-width: 52vw;
+  height: 1.85rem;
+  padding: 0 .5rem;
+  border: 1px solid var(--colors-border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--colors-bg);
+  color: var(--colors-onsurface);
+}
+.osy-md__seltool-url:focus { outline: none; border-color: var(--colors-primary); }
+.osy-md__seltool-unlink { font-size: .78rem; color: var(--md-dim); }
+.osy-md__seltool-unlink:hover { color: var(--colors-danger, #d1453b); }
+
+/* Touch: 40px targets, as in the mobile section — a 1.85rem button is a mouse target, and this toolbar is the one piece
+   of chrome that appears exactly where a thumb already is. */
+@media (hover: none) {
+  .osy-md__seltool-btn { min-width: 2.5rem; height: 2.5rem; }
+  .osy-md__seltool-url { height: 2.5rem; }
+}
+@media (prefers-reduced-motion: reduce) { .osy-md__seltool-btn { transition: none; } }
+
+/* A SELECTED RUN of blocks. Tinted rather than outlined: an outline per block would draw N boxes and read as
+   N separate things, while one continuous wash reads as the single unit it is about to be moved as. */
+.osy-md__block-selected {
+  background: color-mix(in oklch, var(--colors-primary) 12%, transparent);
+  box-shadow: -0.6rem 0 0 color-mix(in oklch, var(--colors-primary) 12%, transparent),
+               0.6rem 0 0 color-mix(in oklch, var(--colors-primary) 12%, transparent);
+  border-radius: 2px;
+}
+
+/* The count of what a menu is about to act on, when it is more than one block. Without it the menu looks like it
+   applies to the block you clicked, and "Delete" on three blocks is not a thing to discover afterwards. */
+.osy-md__blockmenu-count {
+  padding: var(--md-menu-count-pad);
+  color: var(--md-dim);
+  font-size: var(--md-menu-count-font-size);
+  border-bottom: 1px solid var(--md-menu-border-color);
+  margin-bottom: .2rem;
+}
+
+/* Once a sweep has become a BLOCK selection, the browser's text highlight underneath it is a second, more granular
+   answer to "what is selected" — and the wrong one, since the unit being acted on is now whole blocks. Hand the
+   question to the wash alone. */
+.osy-md .ProseMirror:has(.osy-md__block-selected) ::selection { background: transparent; }
+.osy-md .ProseMirror:has(.osy-md__block-selected) .osy-md__block-selected::selection { background: transparent; }
+
+/* With a RUN selected, the single-node outline would draw a second, competing indication around one member of it.
+   The wash already says what is selected, so the outline stands down. */
+.osy-md .ProseMirror:has(.osy-md__block-selected) .ProseMirror-selectednode { outline: none; }
+
+/* A drag in progress: the plugin marks the drop target, and the document should show where it will land. */
+.osy-md .ProseMirror-selectednode {
+  outline: 2px solid color-mix(in oklch, var(--colors-primary, currentColor) 55%, transparent);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm, 6px);
+}
+
+/* Touch has no hover, so a floating margin handle is unreachable — and the drag protocol is mouse-driven anyway.
+   Hide it rather than leave a control that cannot be operated. */
+@media (hover: none) {
+  .osy-md__handle { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .osy-md__handle, .osy-md__handle-btn, .osy-md__handle-grip { transition: none; }
+}
+
+/* A table is the one element that legitimately exceeds the measure; it scrolls inside itself so the PAGE never
+   scrolls sideways at any width. */
+.osy-md table { max-width: 100%; }
+
+@media (prefers-reduced-motion: reduce) { .osy-md__btn { transition: none; } }
+
+/* ── a ```mermaid fence renders its diagram beneath its source ────────────────────────────────────────────────
+   The source stays a normal code block — this is an editor, and a fence whose text was replaced by its picture
+   could not be corrected. So the two are stacked and share one frame: the `pre` loses its bottom corners, the
+   figure takes them, and the pair reads as one block rather than as a code block that happens to be followed by
+   an image. */
+.osy-md [data-mermaid-block] { margin: 0; }
+.osy-md [data-mermaid-block] > pre {
+  margin-bottom: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom: none;
+}
+.osy-md [data-mermaid-render] {
+  border: 1px solid var(--colors-border);
+  border-top: 1px dashed color-mix(in oklch, var(--colors-border) 70%, transparent);
+  border-radius: 0 0 var(--radius-md, 10px) var(--radius-md, 10px);
+  background: var(--colors-surface);
+  padding: 1.15rem;
+  /* A diagram is the one element besides a table that legitimately exceeds the measure — it scrolls inside itself
+     so the PAGE never scrolls sideways, the same rule the table above follows. */
+  overflow-x: auto;
+  display: flex;
+  justify-content: center;
+}
+/* Nothing to show yet, or nothing to show at all: collapse rather than leave an empty framed box, which reads as a
+   diagram that failed. */
+.osy-md [data-mermaid-render][data-mermaid-state="empty"],
+.osy-md [data-mermaid-render][data-mermaid-state="pending"]:empty { display: none; }
+.osy-md [data-mermaid-render] svg { max-width: 100%; height: auto; }
+/* The size mermaid MEASURES its labels at — it must equal DIAGRAM_FONT_PX in diagrams.ts. Stated in both places
+   because both sides participate; neither may pick its own number. */
+.osy-md [data-mermaid-render] { font-size: 15px; }
+
+/* A LABEL MUST NEVER BE CLIPPED.
+   Mermaid sizes each node by measuring its label and writes that width into the SVG as a `foreignObject`, which
+   clips its content by default. Its measurement can run a few percent narrow for this typeface (a 66px box for a
+   label that paints 69px), so "Approved" renders as "Approvec" — which reads as a mistake in the diagram SOURCE
+   rather than as a layout bug, and is therefore the worst possible failure here.
+   We cannot make mermaid's arithmetic agree with the browser's, so we stop it from being destructive: the label
+   renders in full and overhangs its box by about a pixel a side, which nobody will see. Losing a letter is not a
+   trade worth a tighter rectangle. */
+.osy-md [data-mermaid-render] foreignObject { overflow: visible; }
+.osy-md .osy-md-diagram-error {
+  margin: 0;
+  font-family: var(--md-mono);
+  font-size: .8rem;
+  color: var(--md-dim);
+  text-align: center;
+}

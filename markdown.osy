@@ -1,0 +1,141 @@
+// Markdown@1 — the MarkdownEditor control kit (`using Osysharp.MarkdownEditor;`).
+//
+// A headless, dual-mode editor over a `Markdown` property, distributed as an ordinary kit: it is pinned, fetched and
+// hash-verified like any other package, and it can be forked like one. It has no privileged access — it is built on
+// exactly the public foreign-control ABI available to any control author.
+//
+// The document is NOT a prop. Sections are a document's worth of text that the editor rewrites continuously, so the
+// app passes the document's ADDRESS and the control reads/writes it through the platform's app-data channel
+// (`host.data` → /_osy/markdown/{ownerType}/{ownerId}/{property}). Passing the sections as props would mean
+// re-marshalling the whole document through the render tree on every keystroke.
+//
+// The shim (markdown.js, bundled from markdown.ts) owns the editing MECHANICS — Milkdown for the rendered
+// view, CodeMirror 6 for the source view, and the section-identity mapping that keeps each edit attached to the row
+// it belongs to. Every colour and typeface comes from the app's design tokens, so the editor inherits the app's look.
+
+// The kit namespace — its public types enter scope only via `using Osysharp.MarkdownEditor;`. Note what this is NOT: the
+// `Markdown` SCALAR and its document storage are core platform, always present and never gated. This kit ships the
+// EDITOR, which is a control an app opts into.
+namespace Osysharp.MarkdownEditor;
+
+// One entry of the block menu, supplied by the app. A label and the VERB to run — together, in one shape,
+// because a real menu is a MIX: `Run` takes either an app action or one of the editor's own commands below, and an
+// app that had to hand those back in two separate lists could not put them in the order it wanted.
+//
+// PUBLIC because it is part of the kit's surface: an app builds these and hands them to `extraItems`. A top-level
+// type is INTERNAL by default here exactly as in C#, and an internal capability type stays private to the capability
+// — so without the keyword the kit exports a control whose own prop type nobody can name.
+public class MenuEntry {
+  public string Label;
+  public Action Run;
+}
+
+/// A rich markdown EDITOR over one `Markdown` property of one row — the editable counterpart to the `Markdown`
+/// ATOM, which only renders. Two modes over the same document (rich and source), section-at-a-time saves, a block
+/// menu, tables, find and replace, maths and diagrams; every colour and typeface comes from the app's own tokens.
+/// The document is addressed, not passed: give it `ownerType`, `ownerId` and `property` and it reads and writes
+/// the row through the platform's app-data channel, so a keystroke is not a re-render of the whole document.
+/// It is not in `Osysharp.Ui` and not in scope by default — add `use Osysharp.MarkdownEditor@1;` to app.osy, then
+/// `using Osysharp.MarkdownEditor;` in the file that calls it.
+/// e.g. `MarkdownEditor(ownerType: "Article", ownerId: article.Id, property: "Body", placeholder: "Write…")`
+control MarkdownEditor {
+  contractVersion "1.1"
+  participation headless
+  props {
+    string ownerType;                 // the entity type that owns the document
+    Guid ownerId;                     // the row that owns it
+    string property;                  // the Markdown property on that row
+    bool readOnly = false;
+    // The prompt an EMPTY document shows, exactly as `Input`/`Field` do — same word, same job, so it is not a new
+    // concept to learn. Without it a document with nothing in it is a large blank rectangle whose only clue that it
+    // is an editor at all is `0 sections` in the toolbar, which on a phone reads as still-loading rather than empty.
+    // Shown only in rich mode, only when the document is genuinely empty, and never when `readOnly` (there is
+    // nothing to invite). Empty by default: a prompt is the page's words, not the control's.
+    string placeholder = "";
+    // Record-scoped: the document is a FIELD of the owning row — edits join the page's unit of work and land when
+    // the record commits. The page must have a commit for this to be durable. Default false: the document keeps its
+    // own lifetime, which is what a standalone document and any agent writing to it want.
+    bool recordScoped = false;
+    [Values(editorial, sans, serif)] string face = "editorial";   // reading typeface; the control can also cycle it
+    // Density is a per-CALL-SITE choice, not a theme one: the same app shows a document editor and a chat
+    // transcript, and they want different air. A closed set, so a prop rather than a theme token.
+    [Values(comfortable, compact)] string density = "comfortable";
+    // A built-in heading outline down the side. Off by default — it is only worth the width on a long document,
+    // and that is something the page knows and the control does not.
+    bool outline = false;
+    // FIND — the query and the replacement are STATE, so they are props: they have a resting value and the
+    // app owns the boxes the user types into. The editor holds no find UI of its own; it holds the find ENGINE.
+    string? findQuery;
+    string? replaceWith;
+    // The app's own entries in the block menu. The editor draws them with its OWN item chrome and keyboard
+    // model — which is why they arrive as VALUES rather than as app-rendered content: a menu has one look and one
+    // way to be driven, and app markup inside it could join neither.
+    MenuEntry[] extraItems = [];
+  }
+  events {
+    saved(int updated, int created, int deleted);   // what the exact save actually wrote
+    dirty(bool isDirty);                            // unsaved edits pending
+    // The user pressed Cmd-F inside the editor. The editor has no bar to open, so it says so and the APP decides what
+    // to show — carrying the current selection, because searching for what you just highlighted is the common case.
+    findRequested(string selection);
+    // How the search stands, whenever it changes: which match is current (1-based, 0 for none) and how many there are.
+    // This is what lets an app render "3/20" without knowing anything about how matching works.
+    matchesChanged(int current, int total);
+  }
+  // The verbs this editor accepts. Each is a no-argument action with no resting value — asking twice means
+  // asking twice — which is exactly what separates a command from a prop.
+  commands {
+    /// Move to the next match.
+    FindNext;
+    /// Move to the previous match.
+    FindPrev;
+    /// Replace the current match with `replaceWith`.
+    ReplaceOne;
+    /// Replace every match with `replaceWith`.
+    ReplaceAll;
+    /// Drop the search: clears the highlights and the match count.
+    ClearFind;
+    /// Delete the block the menu was opened on (or the whole selected run).
+    DeleteBlock;
+    /// Turn that block into a heading of the given level.
+    TurnIntoHeading(int level);
+  }
+  // A region of the editor's OWN chrome that the app fills. Its content is handed the commands above, so a
+  // page can put its own buttons in the editor's toolbar and have them drive the editor — without the editor
+  // growing a prop for each one, and without the app having to guess at the editor's internals.
+  // The editor ships NO find bar. It renders the app's content here and runs the verbs above — so the bar is the
+  // app's to design, and the matching, highlighting and document edits stay the editor's.
+  slots { Toolbar; }
+  // MATH. Temml + its stylesheet, loaded the first time a document actually contains `$…$` — which is what a
+  // chunk is for: 228 KB that a document of prose never pays for. Temml renders to MathML, so the only font in play
+  // is a 9 KB face for `\mathscr` capitals, inlined into MathCss as a data: URI (see scripts/build-chunks.mjs).
+  // DIAGRAMS. Mermaid, loaded the first time a document actually contains a ```mermaid fence. Registered as a
+  // PACKAGE rather than a file: mermaid loads its own diagram engines at run time, so a flattened bundle would
+  // hand every document with a flowchart the cytoscape and gantt engines too — 3.4 MB instead of a 28 KB entry plus
+  // the chunks that one diagram actually reaches.
+  chunks { Math; MathCss; Diagrams; }
+  // What this editor reports about itself, for an app's tests — facts the screen does not carry.
+  //
+  // Everything above is for the APP: props in, events out, commands in, chrome slots. None of it answers *is the
+  // document dirty*, *how many matches did the search find*, *what is highlighted* — and those reach the screen, if
+  // at all, as PIXELS: a dot beside a filename, a count the app happens to have chosen to render, a tinted range in
+  // a contenteditable. A test could only assert them by reading the APP's rendering of them, which measures the page
+  // rather than the editor, and says nothing at all about an app that renders neither.
+  //
+  // Two of them ARE also events (`dirty`, `matchesChanged`), and that is not a duplication: an event is "this just
+  // changed", a probe is "this is true now". A test that had to listen for a notification in order to learn a
+  // resting fact could not ask the question at all until the editor happened to change its mind.
+  probe {
+    /// Unsaved edits are pending.
+    bool dirty;
+    /// How many find-hits the document currently holds.
+    int matches;
+    /// Which hit is current, 1-based; 0 when there is no search or no hit.
+    int currentMatch;
+    /// What is highlighted right now, or nothing when the selection is empty.
+    string? selection;
+    /// The outline rail's labels, top to bottom, one per line — null when the rail is hidden or the document has
+    /// no heading. A heading's maths is in its label as TeX, so `Where $E = mc^2$ comes from` reads as written.
+    string? outline;
+  }
+}

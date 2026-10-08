@@ -1,0 +1,48 @@
+{
+  "platform": {
+    "version": "0.9.0"
+  },
+  "entries": [
+    {
+      "name": "Osysharp.Markdown",
+      "kind": "package",
+      "version": "1.0.0",
+      "hash": "sha256:1d3c26de068b57c2124ae395a3c5891cb99cc75f6304028539ccaf458080d225",
+      "minPlatform": "0.9.0",
+      "shadow": "app-forkable",
+      "source": "workspace:Platform.Core/Dsl/OsySharp/Baseline/Capabilities/Markdown",
+      "constraint": "1"
+    }
+  ],
+  "controls": [
+    {
+      "name": "MarkdownEditor",
+      "hash": "d1aad8aeced53b70070362fdf2444f4386734486e97917ddfc3073f3f16ea0bc",
+      "file": "markdown.js",
+      "contentType": "text/javascript",
+      "source": "markdown.ts",
+      "chunks": [
+        {
+          "name": "Diagrams",
+          "hash": "968b681b9012a71c267ddf14d33752c08a16ffe02245cb99f4988a62962a09a4",
+          "file": "",
+          "contentType": "application/json",
+          "dir": "diagrams",
+          "entry": "mermaid.esm.min.js"
+        },
+        {
+          "name": "Math",
+          "hash": "f4ab65cd8bda886e414cd80578067ce5cce8948d77c816bc801c32a80afd7594",
+          "file": "temml.js",
+          "contentType": "text/javascript"
+        },
+        {
+          "name": "MathCss",
+          "hash": "593c692af666fb3895e764af5da7ff7305ce0c1fff8590bc12502b687f2a5c9a",
+          "file": "temml.css",
+          "contentType": "text/css"
+        }
+      ]
+    }
+  ]
+}
