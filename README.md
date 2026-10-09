@@ -37,7 +37,7 @@ entity Article {
   security { allow read, update when IsAuthenticated; }
 }
 
-[Page("/articles/{id}")]
+[Route("/articles/{id}")]
 component ArticlePage(Guid id) {
   render {
     MarkdownEditor(ownerType: "Article", ownerId: id, property: "Body", outline: true);
