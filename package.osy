@@ -8,18 +8,15 @@
 // every asset against it when the kit loads, so a bundle rebuilt without re-pinning fails at load instead of in a
 // browser. A package that shipped the bundle without the pins would lose that check.
 package Osysharp.MarkdownEditor {
-  version     "1.0.2";
+  version "1.0.3";
   minPlatform "0.9.0";
   contract    "1.1";
   summary     "a rich EDITOR over a `Markdown` property: rich and source modes, tables, maths.";
 
   model    "*.osy";
 
-  // ⭐ A REAL DEPENDENCY, DECLARED (BASELINE-OUT `BL-3.2`, 2026-09-22). This kit is an EDITOR over a `Markdown`
-  //    property, and a `Markdown` property is storage in `Osysharp.Markdown` — so an editor without it has nothing
-  //    to edit. The edge existed all along and was invisible while the storage was core baseline: both were simply
-  //    present in every app. It became declarable the moment the storage got a package name of its own, and this
-  //    line is the arc's dependency model proving itself on its first case.
+  // ⭐ A REAL DEPENDENCY, DECLARED. This kit is an EDITOR over a `Markdown` property, and a `Markdown` property is
+  //    storage in `Osysharp.Markdown` — so an editor without it has nothing to edit.
   use Osysharp.Markdown@1;
   controls "osyrin.lock";
   controls "markdown.js";
