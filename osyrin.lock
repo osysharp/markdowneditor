@@ -2,18 +2,7 @@
   "platform": {
     "version": "0.9.0"
   },
-  "entries": [
-    {
-      "name": "Osysharp.Markdown",
-      "kind": "package",
-      "version": "1.0.0",
-      "hash": "sha256:1d3c26de068b57c2124ae395a3c5891cb99cc75f6304028539ccaf458080d225",
-      "minPlatform": "0.9.0",
-      "shadow": "app-forkable",
-      "source": "workspace:Platform.Core/Dsl/OsySharp/Baseline/Capabilities/Markdown",
-      "constraint": "1"
-    }
-  ],
+  "entries": [],
   "controls": [
     {
       "name": "MarkdownEditor",
