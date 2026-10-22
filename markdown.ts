@@ -1351,6 +1351,15 @@ export function mount(el: HTMLElement, props: Props, host: Host): MarkdownEditor
     say(`reloaded · ${doc.sections.length} sections`);
   }
 
+  // The page's Undo/Redo moved what this editor staged in the page's unit of work on the server (recordScoped): what
+  // is on screen is no longer what the record holds, so read it again. A pending autosave is dropped first — it was
+  // typed over the text the Undo just took back.
+  const offDataMoved = host.data?.onChanged?.(() => {
+    if (destroyed) return;
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    void reloadFromServer();
+  });
+
   /**
    * Offer the user their own version back after a refused save.
    *
@@ -3447,6 +3456,7 @@ export function mount(el: HTMLElement, props: Props, host: Host): MarkdownEditor
     },
     destroy() {
       destroyed = true;
+      offDataMoved?.();
       appSlotInstance?.destroy();
       if (saveTimer) clearTimeout(saveTimer);
       if (outlineTimer) clearTimeout(outlineTimer);
