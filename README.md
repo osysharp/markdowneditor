@@ -63,6 +63,9 @@ It raises `saved(updated, created, deleted)`, `dirty(isDirty)`, `findRequested(s
 `matchesChanged(current, total)`, and takes the commands `FindNext`, `FindPrev`, `ReplaceOne`, `ReplaceAll`,
 `ClearFind`, `DeleteBlock` and `TurnIntoHeading(level)`.
 
+The editor saves by itself 1.2 s after the last keystroke, and once more when it is removed from the page (a closed
+drawer, a followed link), so the last words typed are not lost. `dirty` is raised on every change of state, both ways.
+
 ## Build your own on top
 
 **Add to it without forking.** The `Toolbar` slot is yours — put your own buttons in it, wired to the editor's

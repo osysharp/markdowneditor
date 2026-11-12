@@ -761,6 +761,24 @@ export function mount(el: HTMLElement, props: Props, host: Host): MarkdownEditor
   let savePending = false;
   /** Bumped by every edit, so a completing save can tell whether the document moved underneath it. */
   let editSeq = 0;
+  /** The `editSeq` the save in flight was taken at, so teardown can tell whether that save already carries everything. */
+  let savingSeq = -1;
+  /** The document as it stood at teardown, still owed to the server. The view it was read from is gone by the time
+   *  it is sent, so the last save works from this and nothing else. */
+  let finalBlocks: Block[] | null = null;
+
+  /** The app follows `dirty` through its event (a Save button, a "Saving…" line), so the flag and the event move
+   *  together: one event per transition, in either direction. */
+  function setDirty(next: boolean) {
+    if (dirty === next) return;
+    dirty = next;
+    host.emit('dirty', next);
+  }
+
+  /** A browser refuses a `keepalive` request whose body is over 64 KiB, so a larger save goes without it: it still
+   *  outlives the editor, only not the page. */
+  const KEEPALIVE_MAX_BYTES = 60_000;
+  type SaveInit = NonNullable<Parameters<NonNullable<Host['data']>['request']>[1]> & { keepalive?: boolean };
 
   // ── chrome ────────────────────────────────────────────────────────────
   const root = el.ownerDocument.createElement('div');
@@ -1346,7 +1364,7 @@ export function mount(el: HTMLElement, props: Props, host: Host): MarkdownEditor
     seedIdentity(doc.sections);
     for (const b of currentBlocks()) if (b.id) serverState.set(b.id, { level: b.level, heading: b.heading, body: b.body });
     ready = true;
-    dirty = false;
+    setDirty(false);
     applyPlaceholder();     // a reload can empty a document that had content, and vice versa
     say(`reloaded · ${doc.sections.length} sections`);
   }
@@ -1402,7 +1420,7 @@ export function mount(el: HTMLElement, props: Props, host: Host): MarkdownEditor
   function markDirty() {
     if (!ready || current.readOnly) return;
     editSeq++;
-    if (!dirty) { dirty = true; host.emit('dirty', true); }
+    setDirty(true);
     say('unsaved…');
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => void save(), AUTOSAVE_MS);
@@ -1423,16 +1441,21 @@ export function mount(el: HTMLElement, props: Props, host: Host): MarkdownEditor
   }
 
   async function save() {
-    if (destroyed || current.readOnly || !view || !host.data) return;
+    if (current.readOnly || !host.data) return;
+    // After teardown the only save left is the one `destroy()` owes, from the document it captured.
+    if (destroyed ? !finalBlocks : !view) return;
     // One save at a time — a second POST would race the first over the same section hashes. Remember that one was
     // owed, though: the timer that asked for it has already expired, so dropping it here loses the edit outright.
     if (saving) { savePending = true; return; }
     if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
     saving = true;
     const seq = editSeq;
+    savingSeq = seq;
+    const last = destroyed;
     say('saving…');
     try {
-      const all = currentBlocks();
+      const all = finalBlocks ?? currentBlocks();
+      finalBlocks = null;
       const structural = isStructural(all);
       const wire = (b: Block) => ({
         id: b.id, level: b.level, heading: b.heading, body: b.body,
@@ -1448,15 +1471,26 @@ export function mount(el: HTMLElement, props: Props, host: Host): MarkdownEditor
             return !held || held.level !== b.level || held.heading !== b.heading || held.body !== b.body;
           }).map(wire);
 
-      if (!structural && blocks.length === 0) { dirty = false; say('saved · nothing changed'); return; }
+      if (!structural && blocks.length === 0) {
+        setDirty(false);
+        say('saved · nothing changed');
+        return;
+      }
 
-      const res = await host.data.request(docPath(), {
-        method: 'POST',
-        body: { blocks, scope: structural ? 'full' : 'partial' },
-      });
+      // `keepalive` on every save that fits, not only the last: a save already in the air when the page unloads is
+      // cancelled with it otherwise, and by then it is too late to ask for it.
+      const body = { blocks, scope: structural ? 'full' : 'partial' };
+      const init: SaveInit = { method: 'POST', body, keepalive: JSON.stringify(body).length <= KEEPALIVE_MAX_BYTES };
+      const res = await host.data.request(docPath(), init);
 
       if (res.status === 409) {
         const c = (await res.json()) as ConflictResponse;
+        if (last) {
+          // No editor is left to offer the text back in, so the browser console is the one place this can be said.
+          const names = c.conflicts.map((k) => k.heading || 'the opening section').join(', ');
+          console.warn(`Markdown editor: the last edit was not saved — ${names} changed while it was being written.`);
+          return;
+        }
         // Hold on to what the user wrote BEFORE re-basing on the server. Reloading is the only safe way to get back
         // to a known state, but reloading without this would throw their edit away — which is the whole cost of a
         // conflict, and the part that has nothing to do with merging.
@@ -1469,7 +1503,12 @@ export function mount(el: HTMLElement, props: Props, host: Host): MarkdownEditor
         showConflict(mine, c.conflicts);
         return;
       }
-      if (!res.ok) { say(`save failed (HTTP ${res.status})`); return; }
+      if (!res.ok) {
+        say(`save failed (HTTP ${res.status})`);
+        if (last) console.warn(`Markdown editor: the last edit was not saved (HTTP ${res.status}).`);
+        return;
+      }
+      if (last) return;                                // stored; there is no editor left to re-pin
       const out = (await res.json()) as SaveResponse;
       // Adopt the identity the server just assigned. Sections the editor created went up with no id and came back
       // with one; without adopting them here the editor would send them as new AGAIN next time, and every save
@@ -1482,7 +1521,7 @@ export function mount(el: HTMLElement, props: Props, host: Host): MarkdownEditor
       // Clean only if the document did NOT move while this save was in the air. An edit that landed mid-flight is
       // not in what the server just acknowledged, and telling the app it is clean would put a Save button (or an
       // unsaved-changes prompt) in the wrong state for as long as the follow-up save takes.
-      if (editSeq === seq) { dirty = false; host.emit('dirty', false); }
+      if (editSeq === seq) setDirty(false);
       host.emit('saved', out.updated.length, out.created.length, out.deleted.length);
       const touched = out.updated.length + out.created.length + out.deleted.length;
       // RECORD-SCOPED SAYS "staged", NOT "saved", and the distinction is not pedantry. In that mode the POST lands in
@@ -1496,11 +1535,13 @@ export function mount(el: HTMLElement, props: Props, host: Host): MarkdownEditor
         : `${verb} · ${out.updated.length} updated, ${out.created.length} new, ${out.deleted.length} removed`);
     } catch (err) {
       say(`save failed: ${(err as Error).message}`);
+      if (last) console.warn(`Markdown editor: the last edit was not saved: ${(err as Error).message}`);
     } finally {
       saving = false;
       // Run the one this save refused. Immediately, not on a fresh debounce: the edit is already at least a full
-      // autosave interval old, and nothing else is going to ask again.
-      if (savePending && !destroyed) { savePending = false; void save(); }
+      // autosave interval old, and nothing else is going to ask again. After teardown `save()` sends only what
+      // `destroy()` captured, once.
+      if (savePending) { savePending = false; void save(); }
     }
   }
 
@@ -3455,10 +3496,18 @@ export function mount(el: HTMLElement, props: Props, host: Host): MarkdownEditor
       if (view && wasReadOnly !== current.readOnly) view.dispatch(view.state.tr);
     },
     destroy() {
+      // What is typed and not yet sent goes out NOW, in this turn: the autosave timer dies with the editor, and a
+      // closed drawer or a followed link arrives sooner than it would have fired. A save already in flight that
+      // carries everything is left alone; one that does not is followed by the captured document when it returns.
+      if (ready && dirty && !current.readOnly && view && host.data) {
+        if (mode === 'raw') toRich();                 // source-mode edits live in CodeMirror until brought back
+        if (!(saving && editSeq === savingSeq)) finalBlocks = currentBlocks();
+      }
       destroyed = true;
+      if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+      if (finalBlocks) void save();
       offDataMoved?.();
       appSlotInstance?.destroy();
-      if (saveTimer) clearTimeout(saveTimer);
       if (outlineTimer) clearTimeout(outlineTimer);
       // The provider appends its handle to the editor's parent, so it outlives a naive replaceChildren.
       blockProvider?.destroy(); blockProvider = null;

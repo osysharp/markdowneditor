@@ -6,7 +6,7 @@
   "controls": [
     {
       "name": "MarkdownEditor",
-      "hash": "d7dbfc34a3c7c2fe676c9f0d02552240bc6622787f2df7c7fdbbdcf3788620c8",
+      "hash": "2eaacf4d84c577a547369519934536418f84759312e14bb8d2c25b6e5099dae5",
       "file": "markdown.js",
       "contentType": "text/javascript",
       "source": "markdown.ts",
