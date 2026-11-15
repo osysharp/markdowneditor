@@ -974,6 +974,8 @@ export function mount(el: HTMLElement, props: Props, host: Host): MarkdownEditor
         ctx.update(editorViewOptionsCtx, (prev: any) => ({
           ...prev,
           editable: () => !current.readOnly,
+          // The surface is a text box, and a text box has a name (WCAG 4.1.2): the page's `label`, else the property's.
+          attributes: () => ({ 'aria-label': accessibleName(), 'aria-multiline': 'true' }),
           /**
            * Clicking a link SHOWS ITS POPOVER rather than navigating — the Google Docs shape, and the one that makes
            * both jobs possible at once. Plain-click-to-navigate (Notion's shape) follows a link fine but costs two
@@ -1573,6 +1575,7 @@ export function mount(el: HTMLElement, props: Props, host: Host): MarkdownEditor
           syntaxHighlighting(cmHighlight),
           CMView.lineWrapping,
           CMView.editable.of(!current.readOnly),
+          CMView.contentAttributes.of({ 'aria-label': accessibleName() }),
           CMView.updateListener.of((u) => { if (u.docChanged) markDirty(); }),
         ],
       }),
@@ -1648,6 +1651,14 @@ export function mount(el: HTMLElement, props: Props, host: Host): MarkdownEditor
     // correctly quoted and escaped CSS string, so a prompt containing a quote or a backslash cannot break out of it.
     if (empty) root.style.setProperty('--osy-md-placeholder', JSON.stringify(text));
     else root.style.removeProperty('--osy-md-placeholder');
+  }
+
+  /** The editor's accessible name: the page's `label`, or the property it edits, in words ("BodyText" → "Body text"). */
+  function accessibleName(): string {
+    const given = (current.label ?? '').trim();
+    if (given !== '') return given;
+    const words = (current.property ?? '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').trim();
+    return words === '' ? 'Document' : words.charAt(0).toUpperCase() + words.slice(1).toLowerCase();
   }
 
   /** Is the rich document devoid of text? Whitespace counts as empty — a stray space is not content a reader sees. */
@@ -3481,6 +3492,10 @@ export function mount(el: HTMLElement, props: Props, host: Host): MarkdownEditor
       // typing, so a document turned read-only must stop offering one).
       if (next.placeholder !== undefined || next.readOnly !== undefined) applyPlaceholder();
       if (next.readOnly !== undefined) applySaveVisibility();
+      if (next.label !== undefined) {
+        view?.dom.setAttribute('aria-label', accessibleName());
+        cm?.contentDOM.setAttribute('aria-label', accessibleName());
+      }
       // An app may compute its entries from its own state, so a changed list redraws them. `undefined` means
       // the app did not send this prop on this update, which is not the same as sending an empty list.
       if (next.extraItems !== undefined) rebuildAppMenuItems?.();

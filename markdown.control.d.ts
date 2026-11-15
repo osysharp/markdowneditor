@@ -103,6 +103,8 @@ export interface MarkdownEditorProps {
   readOnly?: boolean;
   /** `string placeholder` — OPTIONAL: a default is not sent, so apply it in the shim */
   placeholder?: string;
+  /** `string label` — OPTIONAL: a default is not sent, so apply it in the shim */
+  label?: string;
   /** `bool recordScoped` — OPTIONAL: a default is not sent, so apply it in the shim */
   recordScoped?: boolean;
   /** `string face` — one of: editorial, sans, serif — OPTIONAL: a default is not sent, so apply it in the shim */

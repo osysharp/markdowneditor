@@ -52,6 +52,9 @@ control MarkdownEditor {
     // Shown only in rich mode, only when the document is genuinely empty, and never when `readOnly` (there is
     // nothing to invite). Empty by default: a prompt is the page's words, not the control's.
     string placeholder = "";
+    // The document's name to a screen reader, as `Field`'s label is. Empty: the property's own name ("Notes"), so an
+    // editor is never an unnamed text box (WCAG 4.1.2).
+    string label = "";
     // Record-scoped: the document is a FIELD of the owning row — edits join the page's unit of work and land when
     // the record commits. The page must have a commit for this to be durable. Default false: the document keeps its
     // own lifetime, which is what a standalone document and any agent writing to it want.

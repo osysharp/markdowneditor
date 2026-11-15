@@ -45,14 +45,18 @@ component ArticlePage(Guid id) {
 }
 ```
 
-The editor reads and writes the property itself, through your app's own security rules — a reader who may not update
-the row gets a read-only document.
+The editor reads and writes the property itself, through your app's own security rules: a save lands only for a caller
+who may `update` the row that owns the property (and that member), and anyone else's is refused (HTTP 403) with nothing
+written. The editor does not work that out for itself — a caller who may read the row but not update it still gets an
+editable document, and the save reports `save failed (HTTP 403)`. Pass `readOnly: true` for a caller your page knows may
+not update the row.
 
 | prop | default | what it does |
 |---|---|---|
 | `ownerType` · `ownerId` · `property` | — | which row's `Markdown` property the document is |
 | `readOnly` | `false` | show the document without editing |
 | `placeholder` | `""` | text shown in an empty document |
+| `label` | `""` | the document's name to a screen reader; empty is the property's name (`Notes`) |
 | `face` | `editorial` | the reading typeface: `editorial`, `sans` or `serif` |
 | `density` | `comfortable` | `comfortable` or `compact` |
 | `outline` | `false` | the heading outline beside the document |
